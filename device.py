@@ -158,7 +158,7 @@ class Temper(Device):
 		if self.action_on(self.m_cmd):
 			# send one weibo message with pic & @sender 
 			message = u"{emotion}主人，豆芽房间当前温度：{temper}℃  -- {time} {at}".format(
-				        emotion = self.m_emotion
+				        emotion = self.m_emotion,
                         temper = self.__m_temper, 
                         time = time.strftime("%H点%M分", time.localtime()).decode('utf8'),
                         at = u' '.join(executor))
