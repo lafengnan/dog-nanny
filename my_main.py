@@ -99,20 +99,6 @@ cmds_desc = {
              'handler': Proxy.action_ping },
 }
 		
-def get_oauth2_code(app, acc, cb_url, au_url):
-
-    conn = httplib.HTTPSConnection('api.weibo.com')
-    postdata = urllib.urlencode     ({'client_id':app['key'],'response_type':'code',
-    	                              'redirect_uri':cb_url,'action':'submit','userId':acc['id'],
-    	                              'passwd':acc['passwd'],'isLoginSina':0,'from':'','regCallback':'',
-    	                              'state':'','ticket':'','withOfficalFlag':0})
-    conn.request('POST','/oauth2/authorize',postdata,{'Referer':au_url,'Content-Type': 'application/x-www-form-urlencoded'})
-    res = conn.getresponse()
-    location = res.getheader('location')
-    code = location.split('=')[1]
-    conn.close()
-    return code
-
 
 def main():
 	''' This is main routine of program. The process is as follows:
