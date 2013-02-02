@@ -1,17 +1,46 @@
 #! /usr/bin/env python
-# coding=utf-8
+# coding: utf-8
 # author: panzhongbin@gmail.com
 
 from weibo import APIClient, APIError
-from re import split
-import re
 import urllib,httplib,urllib2
 import logging
+import os
 import sys
 import string
 import threading
 
 
+# stores config information
+class ConfigInfo(object):
+	"""docstring for ConfigInfo"""
+	m_appinfo = {'key':'', 'secret':''}
+	m_account = {'id':'', 'passwd':''}
+	m_callback_url = ''
+	m_admins = []
+	def __init__(self, config_file):
+		if os.access(config_file, os.R_OK):
+			with open(config_file) as fp:
+				lines = fp.readlines()
+				if len(lines) is 6:
+					self.m_appinfo['key'] = lines[0].strip('\n')
+					self.m_appinfo['secret'] = lines[1].strip('\n')
+					self.m_account['id'] = lines[2].strip('\n')
+					self.m_account['passwd'] = lines[3].strip('\n')
+					self.m_callback_url = lines[4].strip('\n')
+					admin = unicode(lines[5].strip('\n'), 'utf8')
+					self.m_admins = admin.split()
+
+				else:
+				    fp.close()
+				    logging.error("Content of config file error")
+				    sys.exit(1)
+		else:
+		    logging.error("Read config file denied")
+		    sys.exit(1)
+
+	def get_config_info(self):
+		return (self.m_appinfo, self.m_account, self.m_callback_url, self.m_admins)
 
 
 # Base class of all weibos
@@ -36,7 +65,7 @@ class Weibo(object):
 		pass
 
 # Sina weibo 
-class SinaWeibo():
+class SinaWeibo(Weibo):
 	"""docstring for SinaWeibo"""
 	m_client = None
 	m_weibo_op = ''
@@ -146,28 +175,4 @@ class User(object):
 	def get_screen_name(self):
 		return self.m_name
 
-class MessageContent():
-	"""docstring for MessageContent"""
-	def __init__(self, msg):
-		self.m_date = msg['created_at']
-		self.m_text = msg['text'].strip()
-		self.m_name = msg['user']['name']
-		self.m_msgid = msg['id']
-		self.m_cmd = ''
-	def get_msg_content(self, user):
-        #analysis the @ message
-        #return: (id, sender_name, cmd)
-		pair = re.compile(r"@(\w+) (\w+).*", re.U)
 
-		for key, desc in cmds_desc.items():
-			match = pair.match(self.m_text)
-			if match is not None:
-				if match.group(1) != user.m_name:
-					logging.warning("%s has send a wrong msg on %s" % (match.group(1), self.m_date))
-					return (0, '', '')
-				idx = string.find(match.group(2), desc['pattern'])
-				if 0 == idx:
-					self.m_cmd = key
-					break
-		logging.debug("return command(%s): [%s]: (%s) by %s" % (self.m_date, self.m_cmd, self.m_text, self.m_name))
-		return (self.m_msgid, self.m_name, self.m_cmd)

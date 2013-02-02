@@ -1,66 +1,41 @@
-#! /usr/bin/env python
-# coding=utf-8
+# coding: utf-8
 # author: panzhongbin@gmail.com
 
 import urllib,httplib,urllib2
 import logging
 import time
+import re
+from re import split
 import os
 import sys
 import string
-import subprocess
 import random
 import threading
-import nanny_sns
-from device import DeviceFactory, Home, AirCondition, Temper, Camera
+from nanny_sns import ConfigInfo, SinaWeibo, WeiboFactory, User
+from device import DeviceFactory, AirCondition, Temper, Camera
 
-WORKDIR = os.getcwd()
-TEMPER1 = WORKDIR + '/temper1/temper'
-CAPTURE = WORKDIR + '/capture.py'
-AC_CONTROL = WORKDIR + '/ac-controller/ac-ctrl'
+
 CONFIG_FILE = os.environ['HOME'] + '/dognanny.rc'
 INTERVAL = 30 # 30s
-RESOLUTION = '1280x720'
 
-# stores config information
-class ConfigInfo(object):
-	"""docstring for ConfigInfo"""
-	m_appinfo = {'key':'', 'secret':''}
-	m_account = {'id':'', 'passwd':''}
-	m_callback_url = ''
-	m_admins = []
-	def __init__(self, config_file):
-		if os.access(config_file, os.R_OK):
-			with open(config_file) as fp:
-				lines = fp.readlines()
-				if len(lines) is 6:
-					self.m_appinfo['key'] = lines[0].strip('\n')
-					self.m_appinfo['secret'] = lines[1].strip('\n')
-					self.m_account['id'] = lines[2].strip('\n')
-					self.m_account['passwd'] = lines[3].strip('\n')
-					self.m_callback_url = lines[4].strip('\n')
-					admin = unicode(lines[5].strip('\n'), 'utf8')
-					self.m_admins = admin.split()
-
-				else:
-				    fp.close()
-				    logging.error("Content of config file error")
-				    sys.exit(1)
-		else:
-		    logging.error("Read config file denied")
-		    sys.exit(1)
-
-	def get_config_info(self):
-		return (self.m_appinfo, self.m_account, self.m_callback_url, self.m_admins)
 
 
 class Proxy(object):
 	"""docstring for Proxy"""
 	m_weibo = None
+	m_ac = None
+	m_temper = None
+	m_camera = None
 	def __init__(self):
 		pass
-	def set_proxy(self, weibo):
+	def set_weibo(self, weibo):
 		self.m_weibo = weibo
+	def set_ac(self, ac):
+		self.m_ac = ac
+	def set_temper(self, temper):
+		self.m_temper = temper
+	def set_camera(self, camera):
+		self.m_camera = camera
 	def action_ping(self, client, fans, msgid):
 		logging.debug("%s is pinging me" % fans)
 		client.post.comments__create(comment=u"I'm alive %f" % random.random(), id=msgid)
@@ -68,6 +43,65 @@ class Proxy(object):
 		logging.info(u"kill myself on order of {0}".format(' '.join(fans)))
 		client.post.statuses__update(status=u'下班咯[太开心]' + u' '.join(fans))
 		sys.exit(0)
+	def action_poll(self, client, fans, msgid):
+		print self.m_ac.get_status() 
+		ac_message = u'空调状态: ' + self.m_ac.get_status() + '\n'
+		temper_message = self.m_temper.get_temp_value()
+		message = ac_message + temper_message + u" {at}".format(at=u' '.join(fans)) 
+		# capture a shot
+		self.m_camera.capture()
+		image_path = self.m_camera.get_image_path()
+		try:
+			image_file = open(image_path.strip('\n'))
+			client.upload.statuses__upload(status=message, pic=image_file)
+		except IOError as e:
+			message += u' 照片读取失败 [可怜]'
+			client.post.statuses__update(status=message)
+
+	def action_on(self, client, fans, msgid):
+		self.m_ac.action_on()
+		message = self.m_ac.m_reply + u" {at}".format(at=u' '.join(fans))
+		try:
+			client.post.comments__create(comment=u"%s %f" % (message, random.random()), id=msgid)
+		except APIError as e:
+			logging.error("reply ac on command error: {0}".format(e))
+
+	def action_off(self, client, fans, msgid):
+		self.m_ac.action_off()
+		message = self.m_ac.m_reply + u" {at}".format(at=u' '.join(fans))
+		try:
+			client.post.comments__create(comment=u"%s %f" % (message, random.random()), id=msgid)
+		except APIError as e:
+			logging.error("reply ac on command error: {0}".format(e))
+
+
+
+
+class MessageContent():
+	"""docstring for MessageContent"""
+	def __init__(self, msg):
+		self.m_date = msg['created_at']
+		self.m_text = msg['text'].strip()
+		self.m_name = msg['user']['name']
+		self.m_msgid = msg['id']
+		self.m_cmd = ''
+	def get_msg_content(self, user):
+        #analysis the @ message
+        #return: (id, sender_name, cmd)
+		pair = re.compile(r"@(\w+) (\w+).*", re.U)
+
+		for key, desc in cmds_desc.items():
+			match = pair.match(self.m_text)
+			if match is not None:
+				if match.group(1) != user.m_name:
+					logging.warning("%s has send a wrong msg on %s" % (match.group(1), self.m_date))
+					return (0, '', '')
+				idx = string.find(match.group(2), desc['pattern'])
+				if 0 == idx:
+					self.m_cmd = key
+					break
+		logging.debug("return command(%s): [%s]: (%s) by %s" % (self.m_date, self.m_cmd, self.m_text, self.m_name))
+		return (self.m_msgid, self.m_name, self.m_cmd)
 
 
 # Commands description and handler
@@ -75,27 +109,22 @@ cmds_desc = {
     'poll' : {
              'pattern': u'豆芽呢',
              'desc': u'poll the status',
-             'class': 'Home',
-             'handler': Home.get_home_info },
+             'handler': Proxy.action_poll},
     'acon' : {
              'pattern': u'开空调',
              'desc': u'turn on ac',
-             'class': 'AirCondition',
-             'handler': AirCondition.action_on },
+             'handler': Proxy.action_on },
     'acoff': {
              'pattern': u'关空调',
              'desc': u'turn off ac',
-             'class': 'AirCondition',
-             'handler': AirCondition.action_off },
+             'handler': Proxy.action_off },
     'kill' : {
              'pattern': u'下班吧',
              'desc': u'kill myself',
-             'instance': 'Proxy',
              'handler': Proxy.action_kill },
     'ping' : {
              'pattern': u'ping',
              'desc': u'debug ping',
-             'instance': 'Proxy',
              'handler': Proxy.action_ping },
 }
 		
@@ -123,7 +152,7 @@ def main():
 	logging.info(u"Get Admin account: {0}".format(' '.join(admins)))
 
 	#2. create a weibo
-	weibo_fc = nanny_sns.WeiboFactory()
+	weibo_fc = WeiboFactory.get_instance()
 	sina_weibo = weibo_fc.create_weibo('sina')
 
 	#3. Set weibo client
@@ -143,7 +172,7 @@ def main():
 	request = sina_weibo.set_access_token(code)
 
 	#5. Create a user nanny and set it with weibo info
-	nanny = nanny_sns.User()
+	nanny = User()
 	nanny.set_uid_and_name(sina_weibo)
 
 	#6. Initialize the since_id
@@ -151,7 +180,7 @@ def main():
 
 	#7. Get emotions
 	emotions = []
-	emotions_id = 0
+	emotion_id = 0
 	get_emotions = sina_weibo.m_client.get.emotions()
 	for emotion in get_emotions:
 		emotions.append(emotion['phrase'])
@@ -164,15 +193,22 @@ def main():
 	logging.debug("Start to get command message from id:%s" % since_id)
 
 	#9. Update init message
-	sina_weibo.update_status(u'要干活了[委屈]')
+	sina_weibo.update_status(u'开始工作了[委屈]')
 
 	#10. main loop
+	# Create device
+	dev_fc = DeviceFactory.get_instance()
+	nanny_ac = dev_fc.create_dev('ac')
+	nanny_temper = dev_fc.create_dev('temper')
+	nanny_camera = dev_fc.create_dev('camera')
+
 	# Create a routine proxy
 	nanny_proxy = Proxy()
-	nanny_proxy.set_proxy(sina_weibo)
-	# Create Home instance
-	dev_fc = DeviceFactory()
-	nanny_home = Home(dev_fc)
+	nanny_proxy.set_weibo(sina_weibo)
+	nanny_proxy.set_camera(nanny_camera)
+	nanny_proxy.set_temper(nanny_temper)
+	nanny_proxy.set_ac(nanny_ac)
+
 	while True:
 		now = time.time()
 		tmp_id = since_id
@@ -203,7 +239,7 @@ def main():
 
 		for msg in get_statuses:
 		    # Fetch commands
-		    msg_content = nanny_sns.MessageContent(msg)
+		    msg_content = MessageContent(msg)
 		    (msgid, fans, cmd) = msg_content.get_msg_content(nanny)
 
 		    if tmp_id < msgid:
@@ -246,11 +282,7 @@ def main():
 			instance = None
 			for key, value in cmd_queue.items():
 				logging.debug(u"execute cmd:{0} for {1}".format(key, u''.join(value)))
-				for each_instance in (nanny_home, nanny_home.m_air_condition, nanny_proxy):
-					if each_instance.__class__.__name__ == cmds_desc[key]['class']:
-						instance = each_instance
-						break
-				ret = cmds_desc[key]['handler'](instance, sina_webo.m_client, value, msgid)
+				ret = cmds_desc[key]['handler'](nanny_proxy, sina_weibo.m_client, value, msgid)
 
 
 		cmd_queue.clear()
@@ -267,6 +299,30 @@ if __name__ == '__main__':
             format='%(asctime)s %(levelname)s %(message)s',
             filename='/tmp/dognanny.log',
             filemode='w')
+
+    # make it daemon
+    try:
+        pid = os.fork()
+	if pid > 0:
+           sys.exit(0)
+    except OSError, e:
+        logging.error("fork #1 failed: %d (%s)" % (e.errno, e.strerror))
+        sys.exit(1)
+
+    os.chdir("/")
+    os.setsid()
+    os.umask(0)
+
+    try:
+        pid = os.fork()
+	if pid > 0:
+           logging.info("Daemon pid: %d" % pid)
+           sys.exit(0)
+    except OSError, e:
+        logging.error("fork #2 failed: %d (%s)" % (e.errno, e.strerror))
+        sys.exit(1)
+
+    # main loop
     main()
 
 		
