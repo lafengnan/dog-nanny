@@ -1,4 +1,3 @@
-#! /usr/bin/env python
 # coding: utf-8
 # author: panzhongbin@gmail.com
 
@@ -174,5 +173,4 @@ class User(object):
 		return self.m_uid
 	def get_screen_name(self):
 		return self.m_name
-
 
