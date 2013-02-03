@@ -2,6 +2,7 @@
 # author: panzhongbin@gmail.com
 
 import urllib,httplib,urllib2
+from weibo import APIError
 import logging
 import time
 import re
@@ -12,7 +13,8 @@ import string
 import random
 import threading
 from nanny_sns import ConfigInfo, SinaWeibo, WeiboFactory, User
-from device import DeviceFactory, AirCondition, Temper, Camera
+from device import DeviceFactory, AirCondition, Temper, Camera, WORKDIR
+from spider import PM2D5
 
 
 CONFIG_FILE = os.environ['HOME'] + '/dognanny.rc'
@@ -75,6 +77,25 @@ class Proxy(object):
 			logging.error("reply ac on command error: {0}".format(e))
 
 
+	def get_pm2d5(self, client, fans, msgid):
+
+		url = 'http://www.pm2d5.com/city/shanghai.html'
+		pm2d5 = PM2D5(url)
+		pm2d5.get_pm2d5()
+		image_path = WORKDIR + pm2d5.m_pm2d5_info['image_path']
+		city = pm2d5.m_pm2d5_info['city']
+		pm2d5_value = pm2d5.m_pm2d5_info['pm2d5_value']
+		logging.info("my_main: image_path is %s, %s: %s" %(image_path, city, pm2d5_value))
+
+		message = city + ": " + pm2d5_value + u" {at}".format(at=u' '.join(fans))
+		try:
+			image_file = open(image_path)
+			client.upload.statuses__upload(status=message, pic=image_file)
+		except APIError as e:
+			logging.error("reply ac on command error: {0}".format(e))
+
+
+
 
 
 class MessageContent():
@@ -126,6 +147,10 @@ cmds_desc = {
              'pattern': u'ping',
              'desc': u'debug ping',
              'handler': Proxy.action_ping },
+    'pm2d5' : {
+              'pattern': u'现在空气怎样啊',
+              'desc': u'get pm2.5 info',
+              'handler': Proxy.get_pm2d5}
 }
 		
 
@@ -193,7 +218,7 @@ def main():
 	logging.debug("Start to get command message from id:%s" % since_id)
 
 	#9. Update init message
-	sina_weibo.update_status(u'开始工作了[委屈]')
+	sina_weibo.update_status(u'开始工作了![委屈]')
 
 	#10. main loop
 	# Create device
@@ -248,7 +273,7 @@ def main():
 		    if msgid == 0 or cmd == '':
 		    	continue
 		    # Filter the commands sent by non admin
-		    if (cmd is not 'poll') and (admins.count(fans) == 0):
+		    if (cmd is not 'poll') and (cmd is not 'pm2d5') and (admins.count(fans) == 0):
 		    	# Comment the message
 		    	deny_comment = u"貌似您不是豆芽主人唉%s" % (emotions[emotion_id])
 		    	sina_weibo.m_client.post.comments__create(id=msgid, comment=deny_comment)

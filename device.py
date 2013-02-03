@@ -15,6 +15,7 @@ WORKDIR = os.getcwd()
 TEMPER1 = WORKDIR + '/temper1/temper'
 CAPTURE = WORKDIR + '/capture.py'
 AC_CONTROL = WORKDIR + '/ac-controller/ac-ctrl'
+JGP_PATH = WORKDIR 
 RESOLUTION = '1280x720'
 
 # Device is the base class of all controlled devices
