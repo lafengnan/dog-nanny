@@ -85,9 +85,10 @@ class Proxy(object):
 		image_path = WORKDIR + pm2d5.m_pm2d5_info['image_path']
 		city = pm2d5.m_pm2d5_info['city']
 		pm2d5_value = pm2d5.m_pm2d5_info['pm2d5_value']
+		pm2d5_message = pm2d5.m_pm2d5_info['message']
 		logging.info("my_main: image_path is %s, %s: %s" %(image_path, city, pm2d5_value))
 
-		message = city + ": " + pm2d5_value + u" {at}".format(at=u' '.join(fans))
+		message = city + ": " + pm2d5_value + pm2d5_message + u" {at}".format(at=u' '.join(fans))
 		try:
 			image_file = open(image_path)
 			client.upload.statuses__upload(status=message, pic=image_file)
@@ -218,7 +219,7 @@ def main():
 	logging.debug("Start to get command message from id:%s" % since_id)
 
 	#9. Update init message
-	sina_weibo.update_status(u'开始工作了![委屈]')
+	sina_weibo.update_status(u'开始工作了!![委屈]')
 
 	#10. main loop
 	# Create device

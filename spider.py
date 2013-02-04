@@ -24,6 +24,7 @@ class PM2D5(object):
     m_pm2d5_info = {
     'city': '',
     'pm2d5_value': '',
+    'message': u'',
     'image_path': ''
     }
     def __init__(self, url):
@@ -56,8 +57,15 @@ class PM2D5(object):
                         self.m_pm2d5_info['pm2d5_value'] = value.strip(';').strip('"')
                         if float(self.m_pm2d5_info['pm2d5_value']) < 50:
                             self.m_pm2d5_info['image_path'] = '/1.jpg'
-                            logging.info("image path: %s" % self.m_pm2d5_info['image_path'])
-                            logging.info("%s: %s" %(self.m_pm2d5_info['city'], self.m_pm2d5_info['pm2d5_value']))
+                            self.m_pm2d5_info['message'] = u' 不错 [太开心]'
+                        elif float(self.m_pm2d5_info['pm2d5_value']) > 200:
+                            self.m_pm2d5_info['image_path'] = '/2.jpg'
+                            self.m_pm2d5_info['message'] = u' 霾头苦干吧，亲！[生病]'
+                        else:
+                            self.m_pm2d5_info['image_path'] = '/3.jpg'
+                            self.m_pm2d5_info['message'] = u' 凑活着过吧，亲！[可怜]'
+                        logging.info("image path: %s" % self.m_pm2d5_info['image_path'])
+                        logging.info("%s: %s" %(self.m_pm2d5_info['city'], self.m_pm2d5_info['pm2d5_value']))
 
 
 #if __name__ == '__main__':
