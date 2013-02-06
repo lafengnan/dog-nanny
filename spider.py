@@ -73,7 +73,7 @@ class PM2D5(object):
                             self.m_pm2d5_info['message'] = u' 凑活着过吧，亲！[可怜]'
                         logging.info("image path: %s" % self.m_pm2d5_info['image_path'])
                         logging.info("%s: %s" %(self.m_pm2d5_info['city'], self.m_pm2d5_info['pm2d5_value']))
-            f.close(PM2D5_DATA)
+            fp.close()
             os.rename(PM2D5_DATA, PM2D5_DATA_BK)
         else:
             logging.debug("could not access pm2d5.data")
