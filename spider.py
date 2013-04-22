@@ -33,9 +33,9 @@ class PM2D5(object):
     """docstring for PM2D5"""
     m_pm2d5_info = {
     'city': '',
-    'city_us': u'美领馆',
-    'view': '',
-    'view_us': '',
+    'city_us': u' 美国标准',
+    'standard_cn': '',
+    'standard_us': '',
     'pm2d5_value': '',
 	'pm2d5_value_us':'',
     'message': u'',
@@ -52,36 +52,36 @@ class PM2D5(object):
         parser = MyHTMLParser()
         parser.feed(content)
         city = []
-        view = []
+        standard = []
         value = []
 
         city_pattern = re.compile(r'.*cityname = .*', re.U)
-        view_pattern = re.compile(r'.*jin_caption = cityname \+ .*.', re.U)
+        standard_pattern = re.compile(r'.*jin_caption = cityname \+ .*.', re.U)
         value_pattern = re.compile(r'.*jin_value = "\d+".*', re.U)
         if os.access(PM2D5_DATA, os.R_OK):
             with open(PM2D5_DATA) as fp:
                 lines = fp.readlines()
                 for line in lines:
                     match_city = re.search(city_pattern, line)
-                    match_view = re.search(view_pattern, line)
+                    match_standard = re.search(standard_pattern, line)
                     match_value = re.search(value_pattern, line)
                     if match_city:
                         city.append(match_city.group(0).split('=')[-1].decode('utf8').strip())
-                        self.m_pm2d5_info['city'] = city[0].strip(';').strip('"')
-                    if match_view:
-                        view.append(match_view.group(0).split('+')[-1].decode('utf8').strip())
-                        self.m_pm2d5_info['view'] = view[0].strip(';').strip('"')
-                        logging.info("debug view:%s" %(self.m_pm2d5_info['view']))
-                        if len(view) > 1:
-                           self.m_pm2d5_info['view_us'] = view[1].strip(';').strip('"')
-                           logging.info("debug view_us:%s" %(self.m_pm2d5_info['view_us']))
+                        self.m_pm2d5_info['city'] = city[0].strip(';').strip('"') + u'==>中国标准'
+                    if match_standard:
+                        standard.append(match_standard.group(0).split('+')[-1].decode('utf8').strip())
+                        self.m_pm2d5_info['standard_cn'] = standard[0].strip(';').strip('"')
+                        logging.info("debug standard_cn:%s" %(self.m_pm2d5_info['standard_cn']))
+                        if len(standard) > 1:
+                           self.m_pm2d5_info['standard_us'] = standard[1].strip(';').strip('"')
+                           logging.info("debug standard_us:%s" %(self.m_pm2d5_info['standard_us']))
                     if match_value:
                         value.append(match_value.group(0).split('=')[-1].strip())
                         self.m_pm2d5_info['pm2d5_value'] = value[0].strip(';').strip('"')
-                        logging.info("debug city_value: %s %s: %s" %(self.m_pm2d5_info['city'], self.m_pm2d5_info['view'], self.m_pm2d5_info['pm2d5_value']))
+                        logging.info("debug city_value: %s %s: %s" %(self.m_pm2d5_info['city'], self.m_pm2d5_info['standard_cn'], self.m_pm2d5_info['pm2d5_value']))
                         if (len(value) > 1):
                             self.m_pm2d5_info['pm2d5_value_us'] = value[1].strip(';').strip('"')
-                            logging.info("debug city_value_us: %s %s: %s" %(self.m_pm2d5_info['city'], self.m_pm2d5_info['view_us'], self.m_pm2d5_info['pm2d5_value_us']))
+                            logging.info("debug city_value_us: %s %s: %s" %(self.m_pm2d5_info['city'], self.m_pm2d5_info['standard_us'], self.m_pm2d5_info['pm2d5_value_us']))
                         try:
                             if max(float(self.m_pm2d5_info['pm2d5_value']), float(self.m_pm2d5_info['pm2d5_value_us'])) < 50:
                                 self.m_pm2d5_info['image_path'] = '/1.jpg'
