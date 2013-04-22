@@ -84,13 +84,19 @@ class Proxy(object):
 		pm2d5.get_pm2d5()
 		image_path = WORKDIR + pm2d5.m_pm2d5_info['image_path']
 		city = pm2d5.m_pm2d5_info['city']
-		pm2d5_value = pm2d5.m_pm2d5_info['pm2d5_value']
+		city_us = pm2d5.m_pm2d5_info['city_us']
+		view = pm2d5.m_pm2d5_info['view']
+		view_us = pm2d5.m_pm2d5_info['view_us']
+		pm2d5_value = view + pm2d5.m_pm2d5_info['pm2d5_value']
+		pm2d5_value_us = view_us + pm2d5.m_pm2d5_info['pm2d5_value_us']
 		pm2d5_message = pm2d5.m_pm2d5_info['message']
 		logging.info("my_main: image_path is %s, %s: %s" %(image_path, city, pm2d5_value))
 
-		message = u"{city}：{pm2d5_value}, {pm2d5_message} -- {time}".format(
+		message = u"{city}：{pm2d5_value}, {city_us}: {pm2d5_value_us} {pm2d5_message} -- {time}".format(
 			            city = city,
 			            pm2d5_value = pm2d5_value,
+			            city_us = city_us,
+			            pm2d5_value_us = pm2d5_value_us,
 			            pm2d5_message = pm2d5_message,
                         time = time.strftime("%H点%M分", time.localtime()).decode('utf8')) \
 		+ u" {at}".format(at=u' '.join(fans))
